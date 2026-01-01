@@ -9,11 +9,7 @@ import 'game/overlays/shop_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // 1. Load Data
   await DataManager().load();
-  
-  // 2. Setup Screen
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
@@ -32,49 +28,49 @@ class OceanApp extends StatefulWidget {
 
 class _OceanAppState extends State<OceanApp> {
   late OceanGame _game;
-  
-  // State UI
   int _score = 0;
   int _oxygen = GameConstants.maxOxygen.toInt();
-  
-  // Overlay management
-  // Flame quản lý overlay bằng String keys.
-  // Mặc định ta sẽ hiện 'Menu' trước.
 
   @override
   void initState() {
     super.initState();
     _game = OceanGame(
       onScoreChanged: (score) {
-        // Chỉ setState nếu mounted để tránh lỗi
         if (mounted && _score != score) {
-           // Bọc trong postFrameCallback nếu cần thiết (fix lỗi build)
-           WidgetsBinding.instance.addPostFrameCallback((_) {
-              setState(() => _score = score);
-           });
+           Future.microtask(() => setState(() => _score = score));
         }
       },
       onOxygenChanged: (oxy) {
-        // Oxy đổi liên tục 60fps, ta nên hạn chế setState nếu không cần thiết
-        // Hoặc chấp nhận update UI.
-        // Để tối ưu: Có thể check if (oxy % 5 == 0) mới update.
         if (mounted && _oxygen != oxy) {
-          // Không bọc postFrameCallback cho oxy để mượt hơn, trừ khi crash
           setState(() => _oxygen = oxy);
         }
       },
       onGameOver: (finalScore) {
         if (mounted) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
+          Future.delayed(Duration.zero, () {
              DataManager().addCoins(finalScore);
              DataManager().updateHighScore(finalScore);
-             _game.pauseEngine();
-             _game.overlays.add('GameOver');
-             _game.overlays.remove('HUD');
+             _switchOverlay('GameOver');
           });
         }
       },
     );
+
+    // FIX LỖI: Add Menu thủ công 1 lần duy nhất khi App khởi động
+    // Thay vì dùng initialActiveOverlays dễ gây lỗi khi rebuild
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _game.overlays.add('Menu');
+    });
+  }
+
+  // Hàm chuyển màn hình
+  void _switchOverlay(String newOverlay) {
+    // Xóa tất cả overlay đang hiện
+    final activeOverlays = _game.overlays.activeOverlays.toList();
+    _game.overlays.removeAll(activeOverlays);
+    
+    // Thêm cái mới
+    _game.overlays.add(newOverlay);
   }
 
   @override
@@ -83,16 +79,14 @@ class _OceanAppState extends State<OceanApp> {
       backgroundColor: Colors.black,
       body: GameWidget(
         game: _game,
-        initialActiveOverlays: const ['Menu'], // Bắt đầu ở Menu
+        // FIX LỖI: Xóa dòng initialActiveOverlays ở đây đi!
+        // initialActiveOverlays: const ['Menu'], <--- ĐÃ XÓA
         overlayBuilderMap: {
           'Menu': (context, OceanGame game) => _buildMenu(game),
           'HUD': (context, OceanGame game) => _buildHUD(game),
           'Shop': (context, OceanGame game) => ShopOverlay(
             game: game, 
-            onClose: () {
-              game.overlays.remove('Shop');
-              game.overlays.add('Menu');
-            }
+            onClose: () => _switchOverlay('Menu'),
           ),
           'GameOver': (context, OceanGame game) => _buildGameOver(game),
         },
@@ -104,6 +98,9 @@ class _OceanAppState extends State<OceanApp> {
   Widget _buildMenu(OceanGame game) {
     return Center(
       child: Container(
+        color: Colors.black.withOpacity(0.9),
+        width: double.infinity,
+        height: double.infinity,
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -123,30 +120,28 @@ class _OceanAppState extends State<OceanApp> {
             ),
             const SizedBox(height: 50),
             
-            // Start Button
+            // Nút BẮT ĐẦU
             _buildButton(
               text: "BẮT ĐẦU",
               color: Colors.blue,
               onTap: () {
+                // FIX THỨ TỰ: Chuyển màn hình trước -> Reset sau
+                // Để tránh việc reset gọi setState khi Menu chưa kịp tắt
+                _switchOverlay('HUD'); 
                 game.reset();
-                game.overlays.remove('Menu');
-                game.overlays.add('HUD');
               }
             ),
             const SizedBox(height: 20),
             
-            // Shop Button
             _buildButton(
               text: "CỬA HÀNG",
               color: Colors.orange,
               onTap: () {
-                game.overlays.remove('Menu');
-                game.overlays.add('Shop');
+                _switchOverlay('Shop');
               }
             ),
 
             const SizedBox(height: 50),
-            // Stats
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -171,11 +166,9 @@ class _OceanAppState extends State<OceanApp> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Top Bar
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Score
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
@@ -188,13 +181,10 @@ class _OceanAppState extends State<OceanApp> {
                     style: const TextStyle(color: Colors.yellow, fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                 ),
-                
-                // Exit Button
                 GestureDetector(
                   onTap: () {
                     game.pauseEngine();
-                    game.overlays.remove('HUD');
-                    game.overlays.add('Menu');
+                    _switchOverlay('Menu');
                   },
                   child: Container(
                     padding: const EdgeInsets.all(8),
@@ -204,10 +194,7 @@ class _OceanAppState extends State<OceanApp> {
                 )
               ],
             ),
-            
             const SizedBox(height: 10),
-
-            // Oxygen Bar (Right side aligned)
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -269,8 +256,7 @@ class _OceanAppState extends State<OceanApp> {
                 text: "QUAY LẠI",
                 color: Colors.amber,
                 onTap: () {
-                  game.overlays.remove('GameOver');
-                  game.overlays.add('Menu');
+                  _switchOverlay('Menu');
                 }
               )
             ],
@@ -280,7 +266,6 @@ class _OceanAppState extends State<OceanApp> {
     );
   }
 
-  // Helpers
   Widget _buildButton({required String text, required Color color, required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,

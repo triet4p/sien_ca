@@ -45,20 +45,30 @@ class _ShopOverlayState extends State<ShopOverlay> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Header
+          // Header (FIXED OVERFLOW)
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "XƯỞNG VŨ KHÍ",
-                style: GoogleFonts.baloo2(
-                  fontSize: 32, 
-                  fontWeight: FontWeight.w900, 
-                  color: Colors.white
+              // 1. Tiêu đề: Dùng Expanded để chiếm chỗ trống và FittedBox để tự co nhỏ
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "XƯỞNG VŨ KHÍ", // Có thể đổi thành "SHOP" cho ngắn nếu cần
+                    style: GoogleFonts.baloo2(
+                      fontSize: 32, 
+                      fontWeight: FontWeight.w900, 
+                      color: Colors.white
+                    ),
+                  ),
                 ),
               ),
+              
+              const SizedBox(width: 8),
+
+              // 2. Tiền
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.amber,
                   borderRadius: BorderRadius.circular(20),
@@ -66,32 +76,39 @@ class _ShopOverlayState extends State<ShopOverlay> {
                 child: Text(
                   "${_data.coins} 💰",
                   style: const TextStyle(
-                    fontSize: 20, 
+                    fontSize: 18, 
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF082f49)
                   ),
                 ),
               ),
+              
+              const SizedBox(width: 8),
+
+              // 3. Nút Đóng
               IconButton(
                 onPressed: widget.onClose,
                 icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                padding: EdgeInsets.zero, // Bỏ padding thừa
+                constraints: const BoxConstraints(), // Thu gọn area
               )
             ],
           ),
           
           const SizedBox(height: 20),
 
-          // Grid Vũ khí
+          // Grid Vũ khí (Giữ nguyên)
           Expanded(
             child: GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, // 2 cột cho mobile
-                childAspectRatio: 0.75,
+                crossAxisCount: 2,
+                childAspectRatio: 0.70, // Chỉnh lại tỷ lệ cho thẻ dài ra chút đỡ bị chật
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 10,
               ),
               itemCount: WEAPONS.length,
               itemBuilder: (context, index) {
+                // ... (Giữ nguyên logic bên trong item builder cũ) ...
                 final weapon = WEAPONS[index];
                 final isOwned = _data.hasWeapon(weapon.id);
                 final isEquipped = _data.equippedWeaponId == weapon.id;
@@ -110,7 +127,6 @@ class _ShopOverlayState extends State<ShopOverlay> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Weapon Preview (Vẽ CSS style)
                       Container(
                         width: 60, height: 60,
                         decoration: BoxDecoration(
@@ -126,14 +142,11 @@ class _ShopOverlayState extends State<ShopOverlay> {
                           ),
                         ),
                       ),
-                      
                       const SizedBox(height: 10),
                       Text(
                         weapon.name,
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                       ),
-                      
-                      // Stats
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8.0),
                         child: Column(
@@ -143,10 +156,7 @@ class _ShopOverlayState extends State<ShopOverlay> {
                           ],
                         ),
                       ),
-
                       const Spacer(),
-
-                      // Action Button
                       if (!isOwned)
                         ElevatedButton(
                           onPressed: canAfford ? () => _buy(weapon) : null,
@@ -167,7 +177,6 @@ class _ShopOverlayState extends State<ShopOverlay> {
                           ),
                           child: Text(isEquipped ? "ĐANG DÙNG" : "TRANG BỊ"),
                         ),
-                      
                       const SizedBox(height: 10),
                     ],
                   ),

@@ -37,7 +37,6 @@ class OceanGame extends FlameGame with TapCallbacks {
 
   @override
   Future<void> onLoad() async {
-    // 1. Setup Camera Fixed (800x1200)
     camera = CameraComponent.withFixedResolution(
       width: GameConstants.canvasWidth,
       height: GameConstants.canvasHeight,
@@ -45,20 +44,18 @@ class OceanGame extends FlameGame with TapCallbacks {
     camera.viewfinder.anchor = Anchor.topLeft;
     camera.viewfinder.position = Vector2.zero();
 
-    // 2. Add Background Gradient (Optional - Tạm dùng màu nền)
-    
-    // 3. Add Spear (Add trước để nằm dưới thuyền nếu cần, hoặc quản lý priority)
     spear = Spear(weapon: DataManager().currentWeapon);
     spear.priority = 5;
     world.add(spear);
 
-    // 4. Add Boat
     boat = PlayerBoat();
     world.add(boat);
 
-    // Init Data
     oxygen = GameConstants.maxOxygen;
     currentScore = 0;
+
+    // FIX QUAN TRỌNG: Dừng game ngay khi load xong (để hiện Menu)
+    pauseEngine();
   }
 
   @override
@@ -66,49 +63,37 @@ class OceanGame extends FlameGame with TapCallbacks {
     super.update(dt);
     if (isGameOver) return;
 
-    // 1. Oxygen Drain
-    oxygen -= 0.05 * (dt * 60); // Time-based adjustment
+    oxygen -= 0.05 * (dt * 60);
     onOxygenChanged(oxygen.ceil());
 
     if (oxygen <= 0) {
       isGameOver = true;
+      pauseEngine(); // Dừng game khi chết
       onGameOver(currentScore);
       return;
     }
 
-    // 2. Spawning Logic
     lastSpawnTime += dt;
-    // Spawn mỗi 0.8s nếu chưa quá 25 con
     int fishCount = world.children.whereType<Fish>().length;
     if (lastSpawnTime > 0.8 && fishCount < 25) {
       _spawnFish();
       lastSpawnTime = 0;
     }
 
-    // 3. Collision Detection (Spear vs Fish)
-    if (spear.state == SpearState.flying) { // Chỉ check khi lao đang bay tới
-      // Lấy danh sách cá
+    if (spear.state == SpearState.flying) {
       final fishes = world.children.whereType<Fish>();
-      
       for (final fish in fishes) {
-        // Distance check (Simple circle collision)
         double dist = spear.position.distanceTo(fish.position);
-        
-        // fish.width / 2 + 10 (Hitbox rộng hơn chút)
         if (dist < (fish.size.x / 2 + 10)) {
-          // HIT!
           fish.takeDamage(spear.weapon.damage);
-          spear.returnSpear(); // Lao trúng là quay về ngay
+          spear.returnSpear();
 
-          // Cá chết?
           if (fish.currentHp <= 0) {
             currentScore += fish.template.value;
             onScoreChanged(currentScore);
-            fish.removeFromParent(); // Xóa cá
-            
-            // Effect: Có thể add ParticleEffect nổ tiền ở đây
+            fish.removeFromParent();
           }
-          break; // Mỗi lần lao chỉ trúng 1 con (hoặc xuyên táo nếu muốn upgrade sau)
+          break;
         }
       }
     }
@@ -168,23 +153,19 @@ class OceanGame extends FlameGame with TapCallbacks {
   }
 
   void reset() {
-    // 1. Reset Stats
     oxygen = GameConstants.maxOxygen;
     currentScore = 0;
     isGameOver = false;
     lastSpawnTime = 0;
     
-    // 2. Clear Fishes
     world.children.whereType<Fish>().forEach((f) => f.removeFromParent());
-    
-    // 3. Reset Spear
     spear.reset();
-    updateWeapon(); // Cập nhật lại vũ khí nếu lỡ có đổi trong shop
+    updateWeapon();
     
-    // 4. Update UI ngay lập tức
     onScoreChanged(0);
     onOxygenChanged(oxygen.toInt());
     
-    resumeEngine(); // Đảm bảo game chạy
+    // FIX: Chạy lại game khi bấm Reset/Start
+    resumeEngine();
   }
 }
